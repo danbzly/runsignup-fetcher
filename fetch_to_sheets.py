@@ -48,9 +48,9 @@ except Exception as e:
     raise
 
 # RunSignUp API
-RACE_ID = "6897"
-RESULT_SET_ID = "19904"
-EVENT_ID = "6897"  # Replace with the correct event_id
+RACE_ID = "127835"
+RESULT_SET_ID = "535508"
+EVENT_ID = "127835"  # Replace with the correct event_id
 url = f"https://runsignup.com/rest/race/{RACE_ID}/results/{RESULT_SET_ID}"
 
 def fetch_results():
