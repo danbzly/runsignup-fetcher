@@ -105,7 +105,7 @@ def update_sheet(results):
                 result.get("gender", ""),
                 result.get("age", ""),
                 result.get("overall_place", ""),
-                result.get("city,
+                result.get("city", ""),
                 result.get("State", "")
             ]
             sheet.append_row(row)
