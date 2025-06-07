@@ -2,8 +2,9 @@ import os, json, base64
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
+import xml.etree.ElementTree as ET
 
-# Debug: Check secret presence and content
+# Debug: Check Google credentials
 print("GOOGLE_CREDS_JSON exists:", "GOOGLE_CREDS_JSON" in os.environ)
 print("GOOGLE_CREDS_JSON length:", len(os.environ.get("GOOGLE_CREDS_JSON", "")))
 print("GOOGLE_CREDS_JSON first 50 chars:", os.environ.get("GOOGLE_CREDS_JSON", "")[:50])
@@ -14,7 +15,7 @@ try:
     try:
         google_creds_json = base64.b64decode(google_creds_base64).decode("utf-8")
         print("Base64 decoded successfully, length:", len(google_creds_json))
-        print("Decoded JSON first 50 chars:", google_creds_json[:50])  # Avoid logging sensitive data
+        print("Decoded JSON first 50 chars:", google_creds_json[:50])
     except base64.binascii.Error as e:
         print(f"Base64 decoding failed: {e}")
         raise
@@ -30,8 +31,13 @@ except Exception as e:
     raise
 
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
+try:
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    print("Google client authorized successfully")
+except Exception as e:
+    print(f"Error authorizing Google client: {e}")
+    raise
 
 # Open your sheet
 try:
@@ -44,16 +50,44 @@ except Exception as e:
 # RunSignUp API
 RACE_ID = "6897"
 RESULT_SET_ID = "19904"
+EVENT_ID = "6897"  # Replace with the correct event_id
 url = f"https://runsignup.com/rest/race/{RACE_ID}/results/{RESULT_SET_ID}"
 
 def fetch_results():
     try:
-        response = requests.get(url)
+        api_key = os.environ.get("RUNSIGNUP_API_KEY")
+        params = {"event_id": EVENT_ID, "format": "json"}  # Request JSON format
+        if api_key:
+            params["api_key"] = api_key
+        response = requests.get(url, params=params)
+        print("API URL:", response.url)
+        print("API status code:", response.status_code)
+        print("API response headers:", response.headers)
+        print("API response text (first 500 chars):", response.text[:500])
         response.raise_for_status()
+
+        # Check if response is XML
+        if response.headers.get("Content-Type", "").startswith("text/xml"):
+            print("API returned XML response")
+            try:
+                root = ET.fromstring(response.text)
+                error = root.find("error")
+                if error is not None:
+                    error_code = error.find("error_code").text
+                    error_msg = error.find("error_msg").text
+                    print(f"API error: Code {error_code}, Message: {error_msg}")
+                    raise Exception(f"RunSignUp API error: {error_msg} (Code {error_code})")
+                else:
+                    raise Exception("Unexpected XML response from API")
+            except ET.ParseError as e:
+                print(f"Error parsing XML response: {e}")
+                raise
+
+        # Parse JSON response
         data = response.json()
         print("Successfully fetched API data")
         return data.get("results", [])
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"Error fetching API data: {e}")
         raise
 
@@ -71,16 +105,4 @@ def update_sheet(results):
                 result.get("gender", ""),
                 result.get("age", ""),
                 result.get("overall_place", ""),
-                result.get("city", ""),
-                result.get("state", "")
-            ]
-            sheet.append_row(row)
-        print("Successfully updated Google Sheet")
-    except Exception as e:
-        print(f"Error updating Google Sheet: {e}")
-        raise
-
-if __name__ == "__main__":
-    race_results = fetch_results()
-    update_sheet(race_results)
-    print("✅ Results updated to Google Sheet!")
+                result.get("city
