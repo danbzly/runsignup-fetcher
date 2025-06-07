@@ -105,4 +105,16 @@ def update_sheet(results):
                 result.get("gender", ""),
                 result.get("age", ""),
                 result.get("overall_place", ""),
-                result.get("city
+                result.get("city,
+                result.get("State", "")
+            ]
+            sheet.append_row(row)
+        print("Successfully updated Google Sheet")
+    except Exception as e:
+        print(f"Error updating Google Sheet: {e}")
+        raise
+
+if __name__ == "__main__":
+    race_results = fetch_results()
+    update_sheet(race_results)
+    print("✅ Results updated to Google Sheet!")
