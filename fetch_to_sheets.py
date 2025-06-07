@@ -48,17 +48,14 @@ except Exception as e:
     raise
 
 # RunSignUp API
-RACE_ID = "127835"
-RESULT_SET_ID = "535508"
+RACE_ID = "127835"  # Update with the new race ID if different
+RESULT_SET_ID = "535508"  # Update with the new result set ID if different
 EVENT_ID = "127835"  # Replace with the correct event_id
 url = f"https://runsignup.com/rest/race/{RACE_ID}/results/{RESULT_SET_ID}"
 
 def fetch_results():
     try:
-        api_key = os.environ.get("RUNSIGNUP_API_KEY")
-        params = {"event_id": EVENT_ID, "format": "json"}  # Request JSON format
-        if api_key:
-            params["api_key"] = api_key
+        params = {"event_id": EVENT_ID, "format": "json"}  # No API key for now
         response = requests.get(url, params=params)
         print("API URL:", response.url)
         print("API status code:", response.status_code)
@@ -91,24 +88,32 @@ def fetch_results():
         print(f"Error fetching API data: {e}")
         raise
 
-def update_sheet(results):
+def update_sheet(Race Results):
     try:
         sheet.clear()
+        print("Cleared Google Sheet")
         sheet.append_row(["First Name", "Last Name", "Bib", "Wave", "Time", "Gender", "Age", "Place", "City", "State"])
-        for result in results:
+        print("Appended header row")
+        for i, result in enumerate(results, 1):
+            # Handle Name splitting if provided as a single field
+            full_name = result.get("name", "").strip()  # Adjust based on API field name
+            name_parts = full_name.split(" ", 1)  # Split into first and last name
+            first_name = name_parts[0] if name_parts else ""
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
             row = [
-                result.get("first_name", ""),
-                result.get("last_name", ""),
-                result.get("bib", ""),
-                result.get("wave", ""),
-                result.get("chiptime", ""),
+                first_name,
+                last_name,
+                result.get("bib", ""),  # Adjust based on API field name
+                result.get("wave", ""),  # Adjust if available
+                result.get("chip_time", result.get("chiptime", "")),  # Map to Chip Time
                 result.get("gender", ""),
                 result.get("age", ""),
-                result.get("overall_place", ""),
+                result.get("overall_place", result.get("place", "")),  # Map to Place
                 result.get("city", ""),
-                result.get("State", "")
+                result.get("state", "")
             ]
             sheet.append_row(row)
+            print(f"Appended row {i}: {row}")
         print("Successfully updated Google Sheet")
     except Exception as e:
         print(f"Error updating Google Sheet: {e}")
