@@ -88,7 +88,7 @@ def fetch_results():
         print(f"Error fetching API data: {e}")
         raise
 
-def update_sheet(Race Results):
+def update_sheet(results):
     try:
         sheet.clear()
         print("Cleared Google Sheet")
