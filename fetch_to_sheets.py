@@ -1,8 +1,11 @@
-import os, json, base64
+import os
+import json
+import base64
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
-import xml.etree.ElementTree as ET
+import csv
+import pandas as pd
 
 # Debug: Check Google credentials
 print("GOOGLE_CREDS_JSON exists:", "GOOGLE_CREDS_JSON" in os.environ)
@@ -47,79 +50,49 @@ except Exception as e:
     print(f"Error accessing Google Sheet: {e}")
     raise
 
-# RunSignUp API
-RACE_ID = "127835"  # Update with the new race ID if different
-RESULT_SET_ID = "535508"  # Update with the new result set ID if different
-EVENT_ID = "127835"  # Replace with the correct event_id
-url = f"https://runsignup.com/rest/race/{RACE_ID}/results/{RESULT_SET_ID}"
+# Fetch CSV from URL
+RACE_ID = "21"  # Hardcoded for now, can be made dynamic later
+CSV_URL = f"https://kzmm0b0srmj89em0760o.lite.vusercontent.net/api/race-csv?race_id={RACE_ID}"
 
 def fetch_results():
     try:
-        params = {"event_id": EVENT_ID, "format": "json"}  # No API key for now
-        response = requests.get(url, params=params)
-        print("API URL:", response.url)
-        print("API status code:", response.status_code)
-        print("API response headers:", response.headers)
-        print("API response text (first 500 chars):", response.text[:500])
-        response.raise_for_status()
+        # Download CSV
+        response = requests.get(CSV_URL)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        print("CSV URL:", CSV_URL)
+        print("CSV response status code:", response.status_code)
+        print("CSV response text (first 500 chars):", response.text[:500])
 
-        # Check if response is XML
-        if response.headers.get("Content-Type", "").startswith("text/xml"):
-            print("API returned XML response")
-            try:
-                root = ET.fromstring(response.text)
-                error = root.find("error")
-                if error is not None:
-                    error_code = error.find("error_code").text
-                    error_msg = error.find("error_msg").text
-                    print(f"API error: Code {error_code}, Message: {error_msg}")
-                    raise Exception(f"RunSignUp API error: {error_msg} (Code {error_code})")
-                else:
-                    raise Exception("Unexpected XML response from API")
-            except ET.ParseError as e:
-                print(f"Error parsing XML response: {e}")
-                raise
+        # Load CSV into pandas DataFrame
+        df = pd.read_csv(CSV_URL)
+        print(f"Loaded {len(df)} rows from CSV")
 
-        # Parse JSON response
-        data = response.json()
-        print("Successfully fetched API data")
-        return data.get("results", [])
+        # Convert DataFrame to list of dictionaries for gspread
+        results = df.to_dict(orient="records")
+        print("First result:", results[0] if results else "No results")
+        return results
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching API data: {e}")
+        print(f"Error fetching CSV data: {e}")
+        raise
+    except Exception as e:
+        print(f"Error processing CSV data: {e}")
         raise
 
 def update_sheet(results):
     try:
         sheet.clear()
         print("Cleared Google Sheet")
-        sheet.append_row(["First Name", "Last Name", "Bib", "Wave", "Time", "Gender", "Age", "Place", "City", "State"])
-        print("Appended header row")
+
+        # Get headers from the first row of the DataFrame
+        headers = list(results[0].keys()) if results else []
+        sheet.append_row(headers)  # Write dynamic headers from CSV
+        print(f"Appended header row: {headers}")
+
+        # Write data rows
         for i, result in enumerate(results, 1):
-            # Handle Name splitting if provided as a single field
-            full_name = result.get("name", "").strip()  # Adjust based on API field name
-            name_parts = full_name.split(" ", 1)  # Split into first and last name
-            first_name = name_parts[0] if name_parts else ""
-            last_name = name_parts[1] if len(name_parts) > 1 else ""
-            row = [
-                first_name,
-                last_name,
-                result.get("bib", ""),  # Adjust based on API field name
-                result.get("wave", ""),  # Adjust if available
-                result.get("chip_time", result.get("chiptime", "")),  # Map to Chip Time
-                result.get("gender", ""),
-                result.get("age", ""),
-                result.get("overall_place", result.get("place", "")),  # Map to Place
-                result.get("city", ""),
-                result.get("state", "")
-            ]
+            row = [result.get(header, "") for header in headers]
             sheet.append_row(row)
             print(f"Appended row {i}: {row}")
         print("Successfully updated Google Sheet")
     except Exception as e:
         print(f"Error updating Google Sheet: {e}")
-        raise
-
-if __name__ == "__main__":
-    race_results = fetch_results()
-    update_sheet(race_results)
-    print("✅ Results updated to Google Sheet!")
