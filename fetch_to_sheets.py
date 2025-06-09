@@ -52,7 +52,7 @@ except Exception as e:
 
 # Fetch CSV from URL
 RACE_ID = "21"  # Hardcoded for now, can be made dynamic later
-CSV_URL = f"https://kzmm0b0srmj89em0760o.lite.vusercontent.net/api/race-csv?race_id={RACE_ID}"
+CSV_URL = f"https://kzmid2emy2xxhkskn3go.lite.vusercontent.net/api/race-data?race_id={RACE_ID}&format=csv"
 
 def fetch_results():
     try:
